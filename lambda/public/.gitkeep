@@ -1,0 +1,2 @@
+# Placeholder for built frontend files
+# Run: cd frontend && npm run build && cp -r dist/* ../lambda/public/
