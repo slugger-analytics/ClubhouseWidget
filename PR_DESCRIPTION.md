@@ -256,11 +256,12 @@ All infrastructure is managed via Terraform in `infrastructure/widgets/clubhouse
 - [x] VPC and security group configuration
 - [x] IAM roles and policies configured
 - [x] GitHub Actions deploy role with Lambda permissions
+- [x] GitHub secret `AWS_DEPLOY_ROLE_ARN` configured
+- [x] Frontend switched from Supabase to Lambda API
+- [x] Data migration from Supabase to Aurora completed
+- [x] CI/CD pipeline tested and working
 
 ### Pending 🔄
-- [ ] Add GitHub secret `AWS_DEPLOY_ROLE_ARN` to repository
-- [ ] Switch frontend from Supabase to Lambda API
-- [ ] Data migration from Supabase to Aurora (if needed)
 - [ ] VPC Endpoints for CloudWatch Logs (optional, improves logging)
 - [ ] CloudWatch alarms for Lambda errors/duration
 
