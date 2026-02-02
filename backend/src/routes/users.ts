@@ -5,6 +5,120 @@ import { verifySluggerToken } from '../middleware/auth';
 
 const router = Router();
 
+// IMPORTANT: Specific routes (/me, /me/complete) must be defined BEFORE parameterized routes (/:id, /:id/complete)
+// Express matches routes in order, so /:id would match "me" as an ID if defined first
+
+// Get current user from JWT token (requires authentication)
+// This route uses the middleware to get the authenticated user
+router.get('/me', verifySluggerToken, async (req: Request, res: Response) => {
+  try {
+    // req.user is set by verifySluggerToken middleware
+    // req.user.sub contains the SLUGGER user ID (Cognito user ID)
+    const sluggerUserId = req.user?.sub;
+
+    if (!sluggerUserId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Find user in database by slugger_user_id
+    const { data, error } = await supabase
+      .from('user')
+      .select('*')
+      .eq('slugger_user_id', sluggerUserId)
+      .single();
+
+    if (error) throw error;
+
+    if (!data) {
+      return res.status(404).json({ error: 'User not found in database' });
+    }
+
+    // Fetch team name if user has a team
+    if (data.user_team) {
+      const { data: team } = await supabase
+        .from('teams')
+        .select('team_name')
+        .eq('id', data.user_team)
+        .single();
+
+      return res.json({
+        ...data,
+        team_name: team?.team_name || null,
+      });
+    }
+
+    res.json(data);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Get current user's complete data (uses JWT token, no ID needed)
+router.get('/me/complete', verifySluggerToken, async (req: Request, res: Response) => {
+  try {
+    // Get SLUGGER user ID from JWT token
+    const sluggerUserId = req.user?.sub;
+
+    if (!sluggerUserId) {
+      return res.status(401).json({ error: 'User not authenticated' });
+    }
+
+    // Find user in database by slugger_user_id
+    const { data: user, error: userError } = await supabase
+      .from('user')
+      .select('*')
+      .eq('slugger_user_id', sluggerUserId)
+      .single();
+
+    if (userError) throw userError;
+    if (!user) {
+      return res.status(404).json({ error: 'User not found in database' });
+    }
+
+    // Get team's inventory (if user has a team)
+    let inventory = [];
+    if (user.user_team) {
+      const { data: teamInventory, error: inventoryError } = await supabase
+        .from('inventory')
+        .select('*')
+        .eq('team_id', user.user_team)
+        .order('created_at', { ascending: false });
+
+      if (inventoryError) throw inventoryError;
+      inventory = teamInventory || [];
+    }
+
+    // Get user's tasks
+    const { data: tasks, error: tasksError } = await supabase
+      .from('task')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+
+    if (tasksError) throw tasksError;
+
+    // Fetch team name if user has a team
+    let teamName = null;
+    if (user.user_team) {
+      const { data: team } = await supabase
+        .from('teams')
+        .select('team_name')
+        .eq('id', user.user_team)
+        .single();
+      teamName = team?.team_name || null;
+    }
+
+    res.json({
+      ...user,
+      team_name: teamName,
+      inventory: inventory || [],
+      tasks: tasks || [],
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get all users
 router.get('/', async (req: Request, res: Response) => {
   try {
@@ -118,51 +232,6 @@ router.get('/slugger/:sluggerUserId', async (req: Request, res: Response) => {
   }
 });
 
-// Get current user from JWT token (requires authentication)
-// This route uses the middleware to get the authenticated user
-router.get('/me', verifySluggerToken, async (req: Request, res: Response) => {
-  try {
-    // req.user is set by verifySluggerToken middleware
-    // req.user.sub contains the SLUGGER user ID (Cognito user ID)
-    const sluggerUserId = req.user?.sub;
-
-    if (!sluggerUserId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    // Find user in database by slugger_user_id
-    const { data, error } = await supabase
-      .from('user')
-      .select('*')
-      .eq('slugger_user_id', sluggerUserId)
-      .single();
-
-    if (error) throw error;
-
-    if (!data) {
-      return res.status(404).json({ error: 'User not found in database' });
-    }
-
-    // Fetch team name if user has a team
-    if (data.user_team) {
-      const { data: team } = await supabase
-        .from('teams')
-        .select('team_name')
-        .eq('id', data.user_team)
-        .single();
-
-      return res.json({
-        ...data,
-        team_name: team?.team_name || null,
-      });
-    }
-
-    res.json(data);
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
 // Get users by team ID
 router.get('/team/:teamId', async (req: Request, res: Response) => {
   try {
@@ -239,72 +308,6 @@ router.delete('/:id', async (req: Request, res: Response) => {
     if (error) throw error;
 
     res.status(204).send();
-  } catch (error: any) {
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Get current user's complete data (uses JWT token, no ID needed)
-router.get('/me/complete', verifySluggerToken, async (req: Request, res: Response) => {
-  try {
-    // Get SLUGGER user ID from JWT token
-    const sluggerUserId = req.user?.sub;
-
-    if (!sluggerUserId) {
-      return res.status(401).json({ error: 'User not authenticated' });
-    }
-
-    // Find user in database by slugger_user_id
-    const { data: user, error: userError } = await supabase
-      .from('user')
-      .select('*')
-      .eq('slugger_user_id', sluggerUserId)
-      .single();
-
-    if (userError) throw userError;
-    if (!user) {
-      return res.status(404).json({ error: 'User not found in database' });
-    }
-
-    // Get team's inventory (if user has a team)
-    let inventory = [];
-    if (user.user_team) {
-      const { data: teamInventory, error: inventoryError } = await supabase
-        .from('inventory')
-        .select('*')
-        .eq('team_id', user.user_team)
-        .order('created_at', { ascending: false });
-
-      if (inventoryError) throw inventoryError;
-      inventory = teamInventory || [];
-    }
-
-    // Get user's tasks
-    const { data: tasks, error: tasksError } = await supabase
-      .from('task')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('created_at', { ascending: false });
-
-    if (tasksError) throw tasksError;
-
-    // Fetch team name if user has a team
-    let teamName = null;
-    if (user.user_team) {
-      const { data: team } = await supabase
-        .from('teams')
-        .select('team_name')
-        .eq('id', user.user_team)
-        .single();
-      teamName = team?.team_name || null;
-    }
-
-    res.json({
-      ...user,
-      team_name: teamName,
-      inventory: inventory || [],
-      tasks: tasks || [],
-    });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }

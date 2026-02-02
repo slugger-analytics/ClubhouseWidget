@@ -17,7 +17,7 @@ import { Budget } from './components/Budget';
 import { MealPlanning, PlayerDietaryInfo } from './components/MealPlanning';
 import { Login } from './components/Login';
 import { useAuth } from './contexts/AuthContext';
-import { inventoryApi, taskApi, gamesApi, teamsApi, Inventory, Game } from './services/api';
+import { inventoryApi, taskApi, gamesApi, teamsApi, Inventory, Game } from './services/api-lambda';
 import { Button } from './components/ui/button';
 import { Avatar, AvatarFallback } from './components/ui/avatar';
 

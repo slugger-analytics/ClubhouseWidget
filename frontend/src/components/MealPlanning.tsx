@@ -12,7 +12,7 @@ import { Badge } from './ui/badge';
 import { Utensils, Calendar, Home, Plane } from 'lucide-react';
 import { Textarea } from './ui/textarea';
 import { GameSeries } from './GameSchedule';
-import { mealsApi, Meal } from '../services/api';
+import { mealsApi, Meal } from '../services/api-lambda';
 
 export interface PlayerDietaryInfo {
   id: string;

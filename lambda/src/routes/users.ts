@@ -21,7 +21,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-// Get current user from JWT token
+// Get current user from JWT token (auto-creates if not found)
 router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   try {
     const sluggerUserId = req.user?.cognitoSub;
@@ -29,15 +29,23 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const user = await queryOne<User>(`
+    let user = await queryOne<User>(`
       SELECT u.*, t.team_name
       FROM clubhouse_users u
       LEFT JOIN clubhouse_teams t ON u.team_id = t.id
       WHERE u.slugger_user_id = $1
     `, [sluggerUserId]);
 
+    // Auto-create user if not found
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      // Try to get name from sluggerUserName cookie, fallback to email/username
+      const userName = req.cookies?.sluggerUserName || req.user?.email || req.user?.username || 'New User';
+      user = await queryOne<User>(`
+        INSERT INTO clubhouse_users (slugger_user_id, user_name)
+        VALUES ($1, $2)
+        RETURNING *
+      `, [sluggerUserId, userName]);
+      console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}, name: ${userName}`);
     }
 
     res.json(user);
@@ -47,7 +55,7 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
   }
 });
 
-// Get current user's complete data (user + tasks + inventory)
+// Get current user's complete data (user + tasks + inventory, auto-creates if not found)
 router.get('/me/complete', authMiddleware, async (req: Request, res: Response) => {
   try {
     const sluggerUserId = req.user?.cognitoSub;
@@ -55,32 +63,39 @@ router.get('/me/complete', authMiddleware, async (req: Request, res: Response) =
       return res.status(401).json({ error: 'User not authenticated' });
     }
 
-    const user = await queryOne<User>(`
+    let user = await queryOne<User>(`
       SELECT u.*, t.team_name
       FROM clubhouse_users u
       LEFT JOIN clubhouse_teams t ON u.team_id = t.id
       WHERE u.slugger_user_id = $1
     `, [sluggerUserId]);
 
+    // Auto-create user if not found
     if (!user) {
-      return res.status(404).json({ error: 'User not found' });
+      const userName = req.user?.email || req.user?.username || 'New User';
+      user = await queryOne<User>(`
+        INSERT INTO clubhouse_users (slugger_user_id, user_name)
+        VALUES ($1, $2)
+        RETURNING *
+      `, [sluggerUserId, userName]);
+      console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}`);
     }
 
-    // Get user's tasks
+    // Get user's tasks (empty for new users)
     const tasks = await query(`
       SELECT * FROM clubhouse_tasks
       WHERE user_id = $1
       ORDER BY created_at DESC
-    `, [user.id]);
+    `, [user!.id]);
 
     // Get team's inventory if user has a team
     let inventory: any[] = [];
-    if (user.team_id) {
+    if (user!.team_id) {
       inventory = await query(`
         SELECT * FROM clubhouse_inventory
         WHERE team_id = $1
         ORDER BY created_at DESC
-      `, [user.team_id]);
+      `, [user!.team_id]);
     }
 
     res.json({

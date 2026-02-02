@@ -1,10 +1,10 @@
 // Lambda API Service for ClubhouseWidget
-// Replaces direct Supabase calls with fetch to Lambda backend
-// Used when deployed to AWS (same-origin cookie auth)
+// All API calls go to the Lambda backend on the same domain.
+// Authentication is handled via the shared SLUGGER session cookie (accessToken).
 
 const API_BASE = '/widgets/clubhouse/api';
 
-// Types (same as api.ts)
+// Types
 export type TaskCategory = 
   | 'Medical & Safety'
   | 'Equipment & Field Support'
@@ -92,7 +92,7 @@ async function apiFetch<T>(
 ): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     ...options,
-    credentials: 'include',
+    credentials: 'include', // Send cookies with every request
     headers: {
       'Content-Type': 'application/json',
       ...options.headers,
