@@ -72,13 +72,14 @@ router.get('/me/complete', authMiddleware, async (req: Request, res: Response) =
 
     // Auto-create user if not found
     if (!user) {
-      const userName = req.user?.email || req.user?.username || 'New User';
+      // Try to get name from sluggerUserName cookie, fallback to email/username
+      const userName = req.cookies?.sluggerUserName || req.user?.email || req.user?.username || 'New User';
       user = await queryOne<User>(`
         INSERT INTO clubhouse_users (slugger_user_id, user_name)
         VALUES ($1, $2)
         RETURNING *
       `, [sluggerUserId, userName]);
-      console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}`);
+      console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}, name: ${userName}`);
     }
 
     // Get user's tasks (empty for new users)

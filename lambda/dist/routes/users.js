@@ -35,13 +35,14 @@ router.get('/me', auth_1.authMiddleware, async (req, res) => {
     `, [sluggerUserId]);
         // Auto-create user if not found
         if (!user) {
-            const userName = req.user?.email || req.user?.username || 'New User';
+            // Try to get name from sluggerUserName cookie, fallback to email/username
+            const userName = req.cookies?.sluggerUserName || req.user?.email || req.user?.username || 'New User';
             user = await (0, pool_1.queryOne)(`
         INSERT INTO clubhouse_users (slugger_user_id, user_name)
         VALUES ($1, $2)
         RETURNING *
       `, [sluggerUserId, userName]);
-            console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}`);
+            console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}, name: ${userName}`);
         }
         res.json(user);
     }
@@ -65,13 +66,14 @@ router.get('/me/complete', auth_1.authMiddleware, async (req, res) => {
     `, [sluggerUserId]);
         // Auto-create user if not found
         if (!user) {
-            const userName = req.user?.email || req.user?.username || 'New User';
+            // Try to get name from sluggerUserName cookie, fallback to email/username
+            const userName = req.cookies?.sluggerUserName || req.user?.email || req.user?.username || 'New User';
             user = await (0, pool_1.queryOne)(`
         INSERT INTO clubhouse_users (slugger_user_id, user_name)
         VALUES ($1, $2)
         RETURNING *
       `, [sluggerUserId, userName]);
-            console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}`);
+            console.log(`[Users] Auto-created user for Cognito ID: ${sluggerUserId}, name: ${userName}`);
         }
         // Get user's tasks (empty for new users)
         const tasks = await (0, pool_1.query)(`
