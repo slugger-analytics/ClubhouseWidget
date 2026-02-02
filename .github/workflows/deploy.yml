@@ -4,8 +4,11 @@ on:
   push:
     branches: [main]
     paths:
-      - 'ClubhouseWidget/**'
-      - '!ClubhouseWidget/**.md'
+      - 'frontend/**'
+      - 'lambda/**'
+      - 'backend/**'
+      - '.github/workflows/**'
+      - '!**.md'
   workflow_dispatch:
 
 env:
@@ -30,28 +33,28 @@ jobs:
           node-version: 20
           cache: npm
           cache-dependency-path: |
-            ClubhouseWidget/frontend/package-lock.json
-            ClubhouseWidget/lambda/package-lock.json
+            frontend/package-lock.json
+            lambda/package-lock.json
 
       - name: Install frontend dependencies
-        working-directory: ClubhouseWidget/frontend
+        working-directory: frontend
         run: npm ci
 
       - name: Build frontend
-        working-directory: ClubhouseWidget/frontend
+        working-directory: frontend
         run: npm run build
 
       - name: Copy frontend to Lambda public
         run: |
-          mkdir -p ClubhouseWidget/lambda/public
-          cp -r ClubhouseWidget/frontend/dist/* ClubhouseWidget/lambda/public/
+          mkdir -p lambda/public
+          cp -r frontend/dist/* lambda/public/
 
       - name: Install Lambda dependencies
-        working-directory: ClubhouseWidget/lambda
+        working-directory: lambda
         run: npm ci
 
       - name: Build Lambda
-        working-directory: ClubhouseWidget/lambda
+        working-directory: lambda
         run: npm run build
 
       - name: Configure AWS credentials
@@ -65,7 +68,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Build and push Docker image
-        working-directory: ClubhouseWidget/lambda
+        working-directory: lambda
         env:
           ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
           IMAGE_TAG: ${{ github.sha }}
