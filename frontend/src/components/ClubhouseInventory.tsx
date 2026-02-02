@@ -12,7 +12,7 @@ import { Label } from './ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Package, Sparkles, Heart, Shield, Wrench, FileText, ArrowLeft, Plus, Trash2, Edit, Zap, UtensilsCrossed, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
-import { inventoryApi } from '../services/api';
+import { inventoryApi } from '../services/api-lambda';
 
 // Helper function to get stock level color
 const getStockLevelColor = (current: number, par: number) => {

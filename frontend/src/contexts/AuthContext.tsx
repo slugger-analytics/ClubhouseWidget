@@ -1,18 +1,13 @@
-// Authentication + user-data context for the frontend app.
-// - Decides between SLUGGER-based auth (iframe) and standalone login (local).
-// - Looks up the current user in Supabase by slugger_user_id.
-// - Loads joined user data (tasks, inventory, team) and exposes it to the app.
+// Authentication context for ClubhouseWidget.
+// Uses cookie-based auth - the SLUGGER session cookie is automatically sent with all requests.
+// Widget runs on same domain as SLUGGER, so cookies are shared seamlessly.
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, userApi, UserWithData, setSluggerSDK } from '../services/api';
-import { useSluggerAuth } from '../hooks/useSluggerAuth';
-import { SluggerUser } from '../services/slugger-widget-sdk';
+import { User, userApi, UserWithData } from '../services/api-lambda';
 
 interface AuthContextType {
   user: User | null;
   userData: UserWithData | null;
   loading: boolean;
-  login: (sluggerUserId: string) => Promise<void>;
-  logout: () => void;
   refreshUserData: () => Promise<void>;
 }
 
@@ -30,112 +25,31 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-// Check if running in iframe (SLUGGER shell)
-const isInIframe = typeof window !== 'undefined' && window.self !== window.top;
-
 export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [userData, setUserData] = useState<UserWithData | null>(null);
   const [loading, setLoading] = useState(true);
 
-  // SLUGGER authentication (when in iframe)
-  const { auth: sluggerAuth, user: sluggerUser, loading: sluggerLoading, error: sluggerError, sdk } = useSluggerAuth('clubhouse-management');
-
-  // Set SDK in API service when available
+  // Load current user on mount - cookie is sent automatically
   useEffect(() => {
-    if (sdk) {
-      setSluggerSDK(sdk);
-    }
-  }, [sdk]);
-
-  // Load user from SLUGGER when authenticated
-  useEffect(() => {
-    if (isInIframe && sluggerUser && sdk && !sluggerLoading) {
-      loadUserFromSlugger(sluggerUser);
-    } else if (!isInIframe) {
-      // Not in iframe - use manual login
-      loadUserFromStorage();
-    } else if (isInIframe && !sluggerLoading && !sluggerUser) {
-      // In iframe but no auth yet - still loading
-      setLoading(true);
-    } else if (isInIframe && sluggerError) {
-      // Auth error in iframe
-      setLoading(false);
-    }
-  }, [sluggerUser, sluggerLoading, sluggerError, sdk]);
-
-  const loadUserFromSlugger = async (sluggerUser: SluggerUser) => {
-    try {
-      setLoading(true);
-      // Use slugger_user_id from SLUGGER user (sluggerUser.id is the Cognito sub)
-      const backendUser = await userApi.getUserBySluggerId(sluggerUser.id);
-      const fullUserData = await userApi.getUserWithData(backendUser.id);
-      setUser(backendUser);
-      setUserData(fullUserData);
-    } catch (error) {
-      console.error('Failed to load user from SLUGGER:', error);
-      // Don't clear loading state - let user see error
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadUserFromStorage = async () => {
-    try {
-      const savedUserId = localStorage.getItem('currentUserId');
-      const savedSluggerId = localStorage.getItem('currentSluggerId');
-      
-      if (savedUserId && savedSluggerId) {
-        const userId = parseInt(savedUserId);
-        const userData = await userApi.getUserWithData(userId);
-        setUser(userData);
-        setUserData(userData);
-      }
-    } catch (error) {
-      console.error('Failed to load user:', error);
-      localStorage.removeItem('currentUserId');
-      localStorage.removeItem('currentSluggerId');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Load user from localStorage on mount (only if not in iframe)
-  useEffect(() => {
-    if (!isInIframe) {
-      loadUserFromStorage();
-    }
+    loadCurrentUser();
   }, []);
 
-  const login = async (sluggerUserId: string) => {
-    if (isInIframe) {
-      throw new Error('Manual login not available when running in SLUGGER shell');
-    }
-    
+  const loadCurrentUser = async () => {
     try {
       setLoading(true);
-      const loggedInUser = await userApi.getUserBySluggerId(sluggerUserId);
-      const fullUserData = await userApi.getUserWithData(loggedInUser.id);
-      
-      setUser(loggedInUser);
-      setUserData(fullUserData);
-      
-      // Save to localStorage
-      localStorage.setItem('currentUserId', loggedInUser.id.toString());
-      localStorage.setItem('currentSluggerId', sluggerUserId);
+      // Cookie auth - the accessToken cookie is sent automatically by the browser
+      // Lambda validates the JWT and returns user data (auto-creates if not found)
+      const currentUserData = await userApi.getCurrentUserWithData();
+      setUser(currentUserData);
+      setUserData(currentUserData);
     } catch (error) {
-      console.error('Login failed:', error);
-      throw error;
+      console.error('Failed to load current user:', error);
+      setUser(null);
+      setUserData(null);
     } finally {
       setLoading(false);
     }
-  };
-
-  const logout = () => {
-    setUser(null);
-    setUserData(null);
-    localStorage.removeItem('currentUserId');
-    localStorage.removeItem('currentSluggerId');
   };
 
   const refreshUserData = async () => {
@@ -150,11 +64,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
-  // Combine loading states
-  const combinedLoading = isInIframe ? (sluggerLoading || loading) : loading;
-
   return (
-    <AuthContext.Provider value={{ user, userData, loading: combinedLoading, login, logout, refreshUserData }}>
+    <AuthContext.Provider value={{ user, userData, loading, refreshUserData }}>
       {children}
     </AuthContext.Provider>
   );

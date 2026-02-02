@@ -1,0 +1,7 @@
+=== ROW COUNTS ===
+user: 1 rows
+task: 17 rows
+inventory: 1 rows
+teams: 10 rows
+games: 1132 rows
+meals: 1132 rows
